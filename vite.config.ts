@@ -152,3 +152,7 @@ export default defineConfig({
         },
     })],
 });
+napcatHmrPlugin({
+  wsUrl: 'ws://100.102.255.35:8998',
+  token: '',
+})
