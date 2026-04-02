@@ -19,50 +19,34 @@
  * @license MIT
  */
 
-// src/index.ts
 import type { NapCatPluginContext, PluginModule } from 'napcat-types';
+import path from 'path';
+import fs from 'fs';
 
-/**
- * 监控 API 插件
- * 
- * 提供外部 HTTP 端点，用于查询 QQ 机器人的账号状态（是否在线）
- * 端点地址: GET http://napcat-host:port/plugin/<plugin-id>/api/status
- * 响应格式: { online: boolean, userId?: number, nickname?: string, timestamp: number, error?: string }
- */
 export const plugin_init: PluginModule['plugin_init'] = async (ctx: NapCatPluginContext) => {
-    ctx.logger.info('账号状态监控插件已加载');
+    ctx.logger.info('机器人状态监控插件已加载');
 
-    // 注册无需鉴权的 GET 接口，外部可直接访问
+    // ========== 状态查询 API（根据在线状态返回不同 HTTP 状态码）==========
     ctx.router.getNoAuth('/status', async (req, res) => {
-        ctx.logger.debug(`收到状态查询请求，来自 ${req.headers['x-forwarded-for'] || req.headers.host}`);
-
         try {
-            // 调用 OneBot 标准 Action: get_login_info
-            // 如果机器人在线且适配器工作正常，该调用会成功返回 { user_id, nickname }
-            // 如果机器人已掉线或适配器异常，调用会抛出异常
             const loginInfo = await ctx.actions.call(
                 'get_login_info',
-                void 0,                          // 无参数
+                {},
                 ctx.adapterName,
                 ctx.pluginManager.config
             );
-
-            // 成功获取登录信息 => 机器人在线
-            const userId = loginInfo?.user_id;
-            const nickname = loginInfo?.nickname;
-
-            ctx.logger.debug(`状态查询成功: 在线, QQ=${userId}, 昵称=${nickname}`);
-            res.json({
+            // 在线：返回 200 OK
+            res.status(200).json({
                 online: true,
-                userId,
-                nickname,
+                userId: loginInfo?.user_id,
+                nickname: loginInfo?.nickname,
                 timestamp: Date.now(),
             });
         } catch (err) {
-            // 调用失败 => 机器人离线或网络问题
             const errorMsg = err instanceof Error ? err.message : String(err);
-            ctx.logger.warn(`状态查询失败: 机器人可能离线, 错误: ${errorMsg}`);
-            res.json({
+            ctx.logger.warn(`状态查询失败: ${errorMsg}`);
+            // 离线：返回 503 Service Unavailable
+            res.status(503).json({
                 online: false,
                 error: errorMsg,
                 timestamp: Date.now(),
@@ -70,10 +54,12 @@ export const plugin_init: PluginModule['plugin_init'] = async (ctx: NapCatPlugin
         }
     });
 
-    // 可选：增加一个简单的健康检查端点，用于验证插件是否正常运行
+    // 健康检查（始终返回 200）
     ctx.router.getNoAuth('/health', (_req, res) => {
-        res.json({ status: 'ok', plugin: 'napcat-plugin-monitor' });
+        res.status(200).json({ status: 'ok', plugin: 'napcat-plugin-monitor' });
     });
 };
 
-// 无需清理资源，插件卸载时自动释放路由
+export const plugin_cleanup: PluginModule['plugin_cleanup'] = (ctx) => {
+    ctx.logger.info('机器人状态监控插件已卸载');
+};
