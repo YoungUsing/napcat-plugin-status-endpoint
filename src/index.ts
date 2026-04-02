@@ -15,143 +15,65 @@
  *   plugin_set_config         → 自定义配置保存
  *   plugin_on_config_change   → 配置变更回调
  *
- * @author Your Name
+ * @author YoungUsing
  * @license MIT
  */
 
-import type {
-    PluginModule,
-    PluginConfigSchema,
-    PluginConfigUIController,
-    NapCatPluginContext,
-} from 'napcat-types/napcat-onebot/network/plugin/types';
-import { EventType } from 'napcat-types/napcat-onebot/event/index';
-
-import { buildConfigSchema } from './config';
-import { pluginState } from './core/state';
-import { handleMessage } from './handlers/message-handler';
-import { registerApiRoutes } from './services/api-service';
-import type { PluginConfig } from './types';
-
-// ==================== 配置 UI Schema ====================
-
-/** NapCat WebUI 读取此导出来展示配置面板 */
-export let plugin_config_ui: PluginConfigSchema = [];
-
-// ==================== 生命周期函数 ====================
+// src/index.ts
+import type { NapCatPluginContext, PluginModule } from 'napcat-types';
 
 /**
- * 插件初始化（必选）
- * 加载配置、注册 WebUI 路由和页面
+ * 监控 API 插件
+ * 
+ * 提供外部 HTTP 端点，用于查询 QQ 机器人的账号状态（是否在线）
+ * 端点地址: GET http://napcat-host:port/plugin/<plugin-id>/api/status
+ * 响应格式: { online: boolean, userId?: number, nickname?: string, timestamp: number, error?: string }
  */
-export const plugin_init: PluginModule['plugin_init'] = async (ctx) => {
-    try {
-        // 1. 初始化全局状态（加载配置）
-        pluginState.init(ctx);
+export const plugin_init: PluginModule['plugin_init'] = async (ctx: NapCatPluginContext) => {
+    ctx.logger.info('账号状态监控插件已加载');
 
-        ctx.logger.info('插件初始化中...');
+    // 注册无需鉴权的 GET 接口，外部可直接访问
+    ctx.router.getNoAuth('/status', async (req, res) => {
+        ctx.logger.debug(`收到状态查询请求，来自 ${req.headers['x-forwarded-for'] || req.headers.host}`);
 
-        // 2. 生成配置 Schema（用于 NapCat WebUI 配置面板）
-        plugin_config_ui = buildConfigSchema(ctx);
+        try {
+            // 调用 OneBot 标准 Action: get_login_info
+            // 如果机器人在线且适配器工作正常，该调用会成功返回 { user_id, nickname }
+            // 如果机器人已掉线或适配器异常，调用会抛出异常
+            const loginInfo = await ctx.actions.call(
+                'get_login_info',
+                void 0,                          // 无参数
+                ctx.adapterName,
+                ctx.pluginManager.config
+            );
 
-        // 3. 注册 WebUI 页面和静态资源
-        registerWebUI(ctx);
+            // 成功获取登录信息 => 机器人在线
+            const userId = loginInfo?.user_id;
+            const nickname = loginInfo?.nickname;
 
-        // 4. 注册 API 路由
-        registerApiRoutes(ctx);
-
-        ctx.logger.info('插件初始化完成');
-    } catch (error) {
-        ctx.logger.error('插件初始化失败:', error);
-    }
-};
-
-/**
- * 消息/事件处理（可选）
- * 收到事件时调用，需通过 post_type 判断是否为消息事件
- */
-export const plugin_onmessage: PluginModule['plugin_onmessage'] = async (ctx, event) => {
-    // 仅处理消息事件
-    if (event.post_type !== EventType.MESSAGE) return;
-    // 检查插件是否启用
-    if (!pluginState.config.enabled) return;
-    // 委托给消息处理器
-    await handleMessage(ctx, event);
-};
-
-/**
- * 事件处理（可选）
- * 处理所有 OneBot 事件（通知、请求等）
- */
-export const plugin_onevent: PluginModule['plugin_onevent'] = async (ctx, event) => {
-    // TODO: 在这里处理通知、请求等非消息事件
-    // 示例：
-    // if (event.post_type === EventType.NOTICE) { ... }
-    // if (event.post_type === EventType.REQUEST) { ... }
-};
-
-/**
- * 插件卸载/重载（可选）
- * 必须清理定时器、关闭连接等资源
- */
-export const plugin_cleanup: PluginModule['plugin_cleanup'] = async (ctx) => {
-    try {
-        // TODO: 在这里清理你的资源（定时器、WebSocket 连接等）
-        pluginState.cleanup();
-        ctx.logger.info('插件已卸载');
-    } catch (e) {
-        ctx.logger.warn('插件卸载时出错:', e);
-    }
-};
-
-// ==================== 配置管理钩子 ====================
-
-/** 获取当前配置 */
-export const plugin_get_config: PluginModule['plugin_get_config'] = async (ctx) => {
-    return pluginState.config;
-};
-
-/** 设置配置（完整替换，由 NapCat WebUI 调用） */
-export const plugin_set_config: PluginModule['plugin_set_config'] = async (ctx, config) => {
-    pluginState.replaceConfig(config as PluginConfig);
-    ctx.logger.info('配置已通过 WebUI 更新');
-};
-
-/**
- * 配置变更回调
- * 当 WebUI 中修改单个配置项时触发（需配置项标记 reactive: true）
- */
-export const plugin_on_config_change: PluginModule['plugin_on_config_change'] = async (
-    ctx, ui, key, value, currentConfig
-) => {
-    try {
-        pluginState.updateConfig({ [key]: value });
-        ctx.logger.debug(`配置项 ${key} 已更新`);
-    } catch (err) {
-        ctx.logger.error(`更新配置项 ${key} 失败:`, err);
-    }
-};
-
-// ==================== 内部函数 ====================
-
-/**
- * 注册 WebUI 页面和静态资源
- */
-function registerWebUI(ctx: NapCatPluginContext): void {
-    const router = ctx.router;
-
-    // 托管前端静态资源（构建产物在 webui/ 目录下）
-    // 访问路径: /plugin/<plugin-id>/files/static/
-    router.static('/static', 'webui');
-
-    // 注册仪表盘页面（显示在 NapCat WebUI 侧边栏）
-    // 访问路径: /plugin/<plugin-id>/page/dashboard
-    router.page({
-        path: 'dashboard',
-        title: '插件仪表盘',
-        htmlFile: 'webui/index.html',
-        description: '插件管理控制台',
+            ctx.logger.debug(`状态查询成功: 在线, QQ=${userId}, 昵称=${nickname}`);
+            res.json({
+                online: true,
+                userId,
+                nickname,
+                timestamp: Date.now(),
+            });
+        } catch (err) {
+            // 调用失败 => 机器人离线或网络问题
+            const errorMsg = err instanceof Error ? err.message : String(err);
+            ctx.logger.warn(`状态查询失败: 机器人可能离线, 错误: ${errorMsg}`);
+            res.json({
+                online: false,
+                error: errorMsg,
+                timestamp: Date.now(),
+            });
+        }
     });
 
-    ctx.logger.debug('WebUI 路由注册完成');
-}
+    // 可选：增加一个简单的健康检查端点，用于验证插件是否正常运行
+    ctx.router.getNoAuth('/health', (_req, res) => {
+        res.json({ status: 'ok', plugin: 'napcat-plugin-monitor' });
+    });
+};
+
+// 无需清理资源，插件卸载时自动释放路由
