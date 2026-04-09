@@ -35,8 +35,8 @@ export const plugin_init: PluginModule['plugin_init'] = async (ctx: NapCatPlugin
                 ctx.adapterName,
                 ctx.pluginManager.config
             );
-            // 在线：返回 200 OK
-            res.status(200).json({
+            // 在线：返回 201 Created，区别于默认页
+            res.status(201).json({
                 online: true,
                 userId: loginInfo?.user_id,
                 nickname: loginInfo?.nickname,
