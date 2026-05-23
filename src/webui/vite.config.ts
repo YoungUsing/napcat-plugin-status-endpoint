@@ -22,8 +22,8 @@ export default defineConfig({
     },
     server: {
         proxy: {
-            '/api': 'http://localhost:6099',
-            '/plugin': 'http://localhost:6099',
+            '/api': process.env.NAPCAT_SERVER_URL || 'http://localhost:6099',
+            '/plugin': process.env.NAPCAT_SERVER_URL || 'http://localhost:6099',
         },
     },
 })

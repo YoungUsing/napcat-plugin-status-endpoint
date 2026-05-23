@@ -1,5 +1,3 @@
-/** WebUI 前端类型定义 */
-
 export interface PluginStatus {
     pluginName: string
     uptime: number
@@ -13,16 +11,16 @@ export interface PluginStatus {
 }
 
 export interface PluginConfig {
-    enabled: boolean
     debug: boolean
-    commandPrefix: string
-    cooldownSeconds: number
-    groupConfigs?: Record<string, GroupConfig>
-    // TODO: 在这里添加你的插件配置项类型
+    heartbeatEnabled: boolean
+    heartbeatInterval: number
+    heartbeatMessage: string
+    heartbeatTargetsJson: string
 }
 
-export interface GroupConfig {
-    enabled?: boolean
+export interface HeartbeatTarget {
+    type: 'group' | 'private'
+    id: string
 }
 
 export interface GroupInfo {
@@ -31,8 +29,6 @@ export interface GroupInfo {
     member_count: number
     max_member_count: number
     enabled: boolean
-    /** 定时推送时间（如 '08:30'），null 表示未设置（模板默认不使用，按需扩展） */
-    scheduleTime?: string | null
 }
 
 export interface ApiResponse<T = unknown> {

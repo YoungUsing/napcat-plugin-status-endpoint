@@ -4,6 +4,8 @@ import { showToast } from '../hooks/useToast'
 import type { PluginConfig } from '../types'
 import { IconTerminal } from '../components/icons'
 
+const DEFAULT_TARGETS_JSON = '[\n  {"type": "group", "id": "123456789"},\n  {"type": "private", "id": "987654321"}\n]'
+
 export default function ConfigPage() {
     const [config, setConfig] = useState<PluginConfig | null>(null)
     const [saving, setSaving] = useState(false)
@@ -55,39 +57,44 @@ export default function ConfigPage() {
 
     return (
         <div className="space-y-6 stagger-children">
-            {/* 基础配置 */}
+            {/* 心跳检测 */}
             <div className="card p-5 hover-lift">
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-5">
                     <IconTerminal size={16} className="text-gray-400" />
-                    基础配置
+                    心跳检测
                 </h3>
                 <div className="space-y-5">
                     <ToggleRow
-                        label="启用插件"
-                        desc="全局开关，关闭后不响应任何命令"
-                        checked={config.enabled}
-                        onChange={(v) => updateField('enabled', v)}
-                    />
-                    <ToggleRow
-                        label="调试模式"
-                        desc="启用后输出详细日志到控制台"
-                        checked={config.debug}
-                        onChange={(v) => updateField('debug', v)}
+                        label="启用心跳检测"
+                        desc="开启后定时向指定目标发送消息以检测在线状态"
+                        checked={config.heartbeatEnabled}
+                        onChange={(v) => updateField('heartbeatEnabled', v)}
                     />
                     <InputRow
-                        label="命令前缀"
-                        desc="触发命令的前缀"
-                        value={config.commandPrefix}
-                        onChange={(v) => updateField('commandPrefix', v)}
-                    />
-                    <InputRow
-                        label="冷却时间 (秒)"
-                        desc="同一命令请求冷却时间，0 表示不限制"
-                        value={String(config.cooldownSeconds)}
+                        label="心跳间隔 (秒)"
+                        desc="两次心跳之间的间隔时间，建议不低于 60 秒"
+                        value={String(config.heartbeatInterval)}
                         type="number"
-                        onChange={(v) => updateField('cooldownSeconds', Number(v) || 0)}
+                        onChange={(v) => updateField('heartbeatInterval', Number(v) || 300)}
                     />
-                    {/* TODO: 在这里添加你的配置项 */}
+                    <InputRow
+                        label="心跳消息内容"
+                        desc="发送的心跳消息文本"
+                        value={config.heartbeatMessage}
+                        onChange={(v) => updateField('heartbeatMessage', v)}
+                    />
+                    <div>
+                        <div className="text-sm font-medium text-gray-800 dark:text-gray-200 mb-1">心跳目标（JSON）</div>
+                        <div className="text-xs text-gray-400 mb-2">
+                            JSON 数组，每个目标含 type（group/private）和 id（群号/QQ号）
+                        </div>
+                        <textarea
+                            className="input-field min-h-[120px] font-mono text-xs"
+                            value={config.heartbeatTargetsJson || '[]'}
+                            onChange={(e) => updateField('heartbeatTargetsJson', e.target.value)}
+                            placeholder={DEFAULT_TARGETS_JSON}
+                        />
+                    </div>
                 </div>
             </div>
 
@@ -100,8 +107,6 @@ export default function ConfigPage() {
         </div>
     )
 }
-
-/* ---- 子组件 ---- */
 
 function ToggleRow({ label, desc, checked, onChange }: {
     label: string; desc: string; checked: boolean; onChange: (v: boolean) => void

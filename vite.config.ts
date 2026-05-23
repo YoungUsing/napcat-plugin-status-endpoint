@@ -146,13 +146,10 @@ export default defineConfig({
         outDir: 'dist',
     },
     plugins: [nodeResolve(), copyAssetsPlugin(), napcatHmrPlugin({
+        wsUrl: process.env.DEBUG_WS_URL || 'ws://100.102.255.35:8998',
         webui: {
             distDir: './src/webui/dist',
             targetDir: 'webui',
         },
     })],
 });
-napcatHmrPlugin({
-  wsUrl: 'ws://100.102.255.35:8998',
-  token: '',
-})

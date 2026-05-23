@@ -58,10 +58,10 @@ export default function StatusPage({ status, onRefresh }: StatusPageProps) {
     const statCards = [
         {
             label: '插件状态',
-            value: config.enabled ? '运行中' : '已停用',
+            value: '运行中',
             icon: <IconPower size={18} />,
-            color: config.enabled ? 'text-emerald-500' : 'text-red-400',
-            bg: config.enabled ? 'bg-emerald-500/10' : 'bg-red-500/10',
+            color: 'text-emerald-500',
+            bg: 'bg-emerald-500/10',
         },
         {
             label: '运行时长',
@@ -116,9 +116,8 @@ export default function StatusPage({ status, onRefresh }: StatusPageProps) {
                     </button>
                 </div>
                 <div className="space-y-3">
-                    <InfoRow label="命令前缀" value={config.commandPrefix} />
-                    <InfoRow label="冷却时间" value={`${config.cooldownSeconds} 秒`} />
                     <InfoRow label="调试模式" value={config.debug ? '开启' : '关闭'} />
+                    <InfoRow label="心跳检测" value={config.heartbeatEnabled ? `已开启 (${config.heartbeatInterval}s)` : '关闭'} />
                 </div>
             </div>
         </div>
